@@ -74,6 +74,29 @@ java -jar build/libs/mamat-gunshop-1.0.0-all.jar
 
 ---
 
+## 🖥️ Linux / Niri (Wayland)
+
+Niri memakai `xwayland-satellite` sebagai server X11. Karena sifatnya yang **non-reparenting**, Java AWT bisa menampilkan jendela putih/kosong. Jalankan aplikasi dengan variabel berikut:
+
+```bash
+_JAVA_AWT_WM_NONREPARENTING=1 java -jar build/libs/mamat-gunshop-1.0.0-all.jar
+```
+
+Biar permanen di zsh:
+
+```bash
+echo 'export _JAVA_AWT_WM_NONREPARENTING=1' >> ~/.zshrc
+source ~/.zshrc
+```
+
+Untuk `gradle run`:
+
+```bash
+_JAVA_AWT_WM_NONREPARENTING=1 gradle run
+```
+
+---
+
 ## 🔐 Akun admin
 
 | Username | Password |
