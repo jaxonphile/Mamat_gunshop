@@ -25,9 +25,10 @@ Fokus utama: memfilter produk berdasarkan **kaliber**, tipe, merek, dan harga �
 ## 📁 Struktur proyek
 
 ```
-mamat-gunshop/
-├── PRD.md                     # Product Requirement Document
-├── SRS.md                     # Software Requirement Specification
+Mamat_gunshop/
+├── docs/
+│   ├── PRD.md                 # Product Requirement Document
+│   └── SRS.md                 # Software Requirement Specification
 ├── README.md
 ├── build.gradle
 ├── settings.gradle
@@ -58,7 +59,7 @@ mamat-gunshop/
 ## ▶️ Build & jalankan
 
 ```bash
-cd /home/jax/jax/mamat-gunshop
+cd /home/jax/jax/Mamat_gunshop
 
 # Kompilasi + jalankan unit test
 gradle test
