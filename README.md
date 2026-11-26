@@ -56,60 +56,100 @@ Mamat_gunshop/
 
 ## 🔧 Prasyarat
 
-- JDK 25 (`java -version`)
-- Gradle 9.9 (`gradle -version`)
+### Jalur launcher (disarankan)
+
+- **Windows 10/11** atau **Linux/macOS** dengan Bash
+- PowerShell bawaan Windows (`powershell.exe`, sudah ada di Windows 10+)
+- Koneksi internet **saat run pertama**
+- Ruang disk ± 400 MB (JDK portabel + Gradle + dependency)
+- **Tidak perlu** install Java atau Gradle manual
+
+### Jalur manual
+
+- JDK 25 atau lebih baru (`java -version` → harus `25.x`)
+- Gradle 9.9 — atau cukup pakai Gradle Wrapper yang sudah disertakan (`gradlew` / `gradlew.bat`)
 - Koneksi internet saat build pertama (Jackson & JUnit diunduh dari Maven Central)
 
 ---
 
-## ▶️ Build & jalankan
+## ▶️ Cara menjalankan
 
-### 🚀 Cara paling gampang (auto-install)
+### 🚀 Windows — paling gampang (auto-install)
 
-Tidak perlu install Java atau Gradle manual.
+1. Download/clone repo ini, lalu ekstrak ke folder misalnya `Mamat_gunshop`.
+2. Buka folder tersebut.
+3. **Klik dua kali `run.bat`**.
+4. Tunggu jendela PowerShell selesai mengunduh & membangun.
+5. Aplikasi `Mamat Gunshop` akan langsung terbuka.
 
-**Windows:** klik dua kali `run.bat`  
-**Linux / macOS:**
+> Kalau muncul peringatan SmartScreen, pilih **More info → Run anyway**.
+
+### 🚀 Linux / macOS — paling gampang (auto-install)
 
 ```bash
 cd /home/jax/jax/Mamat_gunshop
 ./run.sh
 ```
 
-Saat pertama kali dijalankan, launcher akan:
+Kalau file tidak executable (misalnya hasil download ZIP, bukan `git clone`):
 
-1. Memakai JDK 25 yang sudah ada — kalau belum ada, unduh **Temurin 25** ke `~/.mamatgunshop/runtime` (Windows: `%USERPROFILE%\.mamatgunshop\runtime`)
-2. Memverifikasi checksum SHA-256 JDK sebelum dipakai
-3. Mengunduh Gradle 9.9 lewat **Gradle Wrapper** dan dependency (Jackson, JUnit)
-4. Membangun `mamat-gunshop-1.0.0-all.jar`
-5. Menjalankan aplikasi
+```bash
+chmod +x run.sh scripts/bootstrap.sh gradlew
+./run.sh
+```
 
-Butuh koneksi internet hanya pada run pertama (atau saat source berubah). Run berikutnya langsung jalan.
+### Apa yang terjadi saat run pertama
+
+Launcher akan otomatis:
+
+1. Memakai JDK 25 yang sudah ada — kalau belum ada, unduh **Temurin 25** ke:
+   - Linux/macOS: `~/.mamatgunshop/runtime/jdk-25`
+   - Windows: `%USERPROFILE%\.mamatgunshop\runtime\jdk-25`
+2. Memverifikasi checksum SHA-256 JDK sebelum dipakai.
+3. Mengunduh Gradle 9.9 lewat **Gradle Wrapper** beserta dependency (Jackson, JUnit).
+4. Membangun `build/libs/mamat-gunshop-1.0.0-all.jar`.
+5. Menjalankan aplikasi.
+
+Run berikutnya tidak mengunduh ulang kecuali source berubah.
 
 ### 🔧 Cara manual (opsional)
+
+Sudah ada JDK 25 / Gradle terpasang, atau ingin kontrol penuh:
 
 ```bash
 cd /home/jax/jax/Mamat_gunshop
 
 # Kompilasi + jalankan unit test
-gradle test
+./gradlew test
 
 # Jalankan aplikasi
-gradle run
+./gradlew run
 
 # Bangun JAR mandiri (sudah termasuk dependency)
-gradle fatJar
+./gradlew fatJar
 java -jar build/libs/mamat-gunshop-1.0.0-all.jar
 ```
+
+Di Windows, ganti `./gradlew` dengan `gradlew.bat`.
 
 ---
 
 ## 🖥️ Linux / Niri (Wayland)
 
-Niri memakai `xwayland-satellite` sebagai server X11. Karena sifatnya yang **non-reparenting**, Java AWT bisa menampilkan jendela putih/kosong. Jalankan aplikasi dengan variabel berikut:
+Niri memakai `xwayland-satellite` sebagai server X11. Karena sifatnya yang **non-reparenting**, Java AWT bisa menampilkan jendela putih/kosong.
+
+✅ **Kalau menjalankan lewat `./run.sh`, ini sudah ditangani otomatis.**
+
+Kalau menjalankan manual, tambahkan variabel berikut:
 
 ```bash
 _JAVA_AWT_WM_NONREPARENTING=1 java -jar build/libs/mamat-gunshop-1.0.0-all.jar
+```
+
+Atau untuk `gradlew run`:
+
+```bash
+_JAVA_AWT_WM_NONREPARENTING=1 ./gradlew run
 ```
 
 Biar permanen di zsh:
@@ -119,11 +159,15 @@ echo 'export _JAVA_AWT_WM_NONREPARENTING=1' >> ~/.zshrc
 source ~/.zshrc
 ```
 
-Untuk `gradle run`:
+---
 
-```bash
-_JAVA_AWT_WM_NONREPARENTING=1 gradle run
-```
+## 🩺 Kalau launcher gagal
+
+- Pastikan koneksi internet aktif saat run pertama.
+- Kalau unduhan terputus, hapus file `*.part` di folder `runtime`, lalu jalankan lagi.
+- Kalau JDK otomatis gagal dipakai, hapus folder `runtime/jdk-25` lalu ulangi.
+- Launcher **tidak perlu hak administrator**; semua file disimpan di folder user.
+- Cek log di jendela PowerShell/terminal untuk pesan error spesifik.
 
 ---
 
@@ -141,20 +185,20 @@ Tombol **Admin** di jendela utama akan meminta login ini.
 
 Saat pertama kali dijalankan, aplikasi menyalin seed data ke:
 
-```
-~/.mamatgunshop/products.json
-~/.mamatgunshop/orders.json
-```
+- Linux/macOS: `~/.mamatgunshop/products.json` dan `~/.mamatgunshop/orders.json`
+- Windows: `%USERPROFILE%\.mamatgunshop\products.json` dan `%USERPROFILE%\.mamatgunshop\orders.json`
 
-Hapus folder `~/.mamatgunshop` untuk mengembalikan data ke kondisi awal (seed 12 produk).
+Hapus folder `.mamatgunshop` untuk mengembalikan data ke kondisi awal (seed 12 produk).
 
 ---
 
 ## 🧪 Pengujian
 
 ```bash
-gradle test
+./gradlew test
 ```
+
+Di Windows: `gradlew.bat test`.
 
 Unit test mencakup: filter katalog, kombinasi filter, sorting, batas stok keranjang, validasi KTP/usia, pembuatan order, pengurangan stok, dan validasi produk admin.
 
