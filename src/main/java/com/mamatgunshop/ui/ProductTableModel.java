@@ -1,13 +1,12 @@
 package com.mamatgunshop.ui;
 
 import com.mamatgunshop.model.Product;
-import com.mamatgunshop.util.Money;
 
 import javax.swing.table.AbstractTableModel;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Model tabel untuk menampilkan hasil katalog. */
+/** Model tabel katalog. Format tampilan ditangani renderer di UiTheme. */
 public class ProductTableModel extends AbstractTableModel {
 
     private static final String[] COLUMNS = {
@@ -45,7 +44,11 @@ public class ProductTableModel extends AbstractTableModel {
 
     @Override
     public Class<?> getColumnClass(int columnIndex) {
-        return (columnIndex == 4 || columnIndex == 6) ? Integer.class : String.class;
+        return switch (columnIndex) {
+            case 4, 6 -> Integer.class;
+            case 5 -> java.math.BigDecimal.class;
+            default -> String.class;
+        };
     }
 
     @Override
@@ -57,7 +60,7 @@ public class ProductTableModel extends AbstractTableModel {
             case 2 -> p.getType() == null ? "-" : p.getType().getLabel();
             case 3 -> p.getCaliber();
             case 4 -> p.getCapacity();
-            case 5 -> Money.format(p.getPrice());
+            case 5 -> p.getPrice();
             case 6 -> p.getStock();
             default -> "";
         };

@@ -1,10 +1,13 @@
 package com.mamatgunshop.ui;
 
 import com.mamatgunshop.AppContext;
+import com.mamatgunshop.model.FilterCriteria;
 import com.mamatgunshop.model.Product;
+import com.mamatgunshop.model.SortOption;
 import com.mamatgunshop.util.Money;
 
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
@@ -13,15 +16,18 @@ import javax.swing.JLabel;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.JComboBox;
+import javax.swing.ListSelectionModel;
 import javax.swing.SpinnerNumberModel;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -31,51 +37,87 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/** Jendela utama: header, panel filter, tabel katalog, dan panel aksi. */
+/** Jendela utama: app bar, toolbar, katalog, detail, dan bar aksi. */
 public class MainFrame extends JFrame {
 
     private final AppContext context;
     private final FilterPanel filterPanel;
     private final ProductTableModel tableModel = new ProductTableModel();
     private final JTable table = new JTable(tableModel);
-    private final JLabel statusLabel = new JLabel();
-    private final JTextArea detailArea = new JTextArea();
+
+    private final JTextField searchField = UiTheme.field();
+    private final JComboBox<SortOption> sortCombo = new JComboBox<>(SortOption.values());
+    private final JLabel resultLabel = UiTheme.muted("");
+    private final JLabel statusLabel = UiTheme.muted("Siap.");
+
+    private final JLabel detailName = UiTheme.heading("Pilih produk");
+    private final JLabel detailMeta = UiTheme.muted("Klik baris pada tabel untuk melihat detail.");
+    private final JLabel detailPrice = UiTheme.subheading("Rp 0");
+    private final JLabel detailStock = UiTheme.muted("");
+    private final JTextArea detailDescription = UiTheme.area(3, 30);
     private final JSpinner qtySpinner = new JSpinner(new SpinnerNumberModel(1, 1, 999, 1));
-    private final JButton addButton = UiUtils.primary("Tambah ke Keranjang");
-    private final JButton cartButton = UiUtils.primary("Keranjang (0)");
+    private final JButton addButton = UiTheme.primary("Tambah ke keranjang");
+    private final JButton cartButton = UiTheme.secondary("Keranjang (0)");
+
+    private Product selectedProduct;
 
     public MainFrame(AppContext context) {
         this.context = context;
         setTitle("Mamat Gunshop — Katalog Senjata");
-        setSize(1180, 760);
+        setSize(1220, 780);
+        setMinimumSize(new Dimension(980, 640));
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
+        getContentPane().setBackground(UiTheme.CANVAS);
 
         filterPanel = new FilterPanel(this::refreshCatalog);
         setJMenuBar(buildMenuBar());
 
-        setLayout(new BorderLayout(8, 8));
-        add(buildHeader(), BorderLayout.NORTH);
+        setLayout(new BorderLayout(0, 0));
+        add(buildAppBar(), BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
-        add(buildBottom(), BorderLayout.SOUTH);
+        add(buildActionBar(), BorderLayout.SOUTH);
 
-        table.setRowHeight(26);
-        table.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        UiTheme.styleTable(table);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateDetail();
             }
         });
+
+        searchField.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                refreshCatalog();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                refreshCatalog();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                refreshCatalog();
+            }
+        });
+        sortCombo.addActionListener(e -> refreshCatalog());
         addButton.addActionListener(e -> addToCart());
         cartButton.addActionListener(e -> openCart());
+
+        detailDescription.setEditable(false);
+        detailDescription.setBackground(UiTheme.SURFACE);
 
         refreshOptions();
         refreshCatalog();
         updateCartButton();
+        setStatus("Katalog siap. Gunakan filter kaliber untuk mempersempit pilihan.");
     }
 
     private JMenuBar buildMenuBar() {
         JMenuBar menuBar = new JMenuBar();
+        menuBar.setBackground(UiTheme.SURFACE);
 
         JMenu fileMenu = new JMenu("File");
         JMenuItem exportItem = new JMenuItem("Export katalog ke CSV...");
@@ -89,7 +131,7 @@ public class MainFrame extends JFrame {
         JMenu helpMenu = new JMenu("Bantuan");
         JMenuItem aboutItem = new JMenuItem("Tentang");
         aboutItem.addActionListener(e -> UiUtils.showInfo(this,
-                "Mamat Gunshop v1.0.0\nAplikasi katalog & kasir senjata (demo lokal).\nJava 25 • Swing • Gradle"));
+                "Mamat Gunshop v1.0.0\nKatalog & kasir senjata (demo lokal).\nJava 25 • Swing • Gradle"));
         helpMenu.add(aboutItem);
 
         menuBar.add(fileMenu);
@@ -97,75 +139,139 @@ public class MainFrame extends JFrame {
         return menuBar;
     }
 
-    private JPanel buildHeader() {
-        JPanel header = new JPanel(new BorderLayout());
-        header.setBorder(BorderFactory.createEmptyBorder(10, 14, 4, 14));
+    private JPanel buildAppBar() {
+        JPanel bar = new JPanel(new BorderLayout(14, 0));
+        bar.setBackground(UiTheme.SURFACE);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(14, 18, 14, 18)));
 
-        JLabel title = new JLabel("MAMAT GUNSHOP");
-        title.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 22));
-        header.add(title, BorderLayout.WEST);
+        JPanel brand = new JPanel(new BorderLayout(12, 0));
+        brand.setBackground(UiTheme.SURFACE);
 
-        JLabel subtitle = new JLabel("Cari senjata sesuai kaliber, merek, dan budget Anda");
-        subtitle.setFont(new Font(Font.SANS_SERIF, Font.ITALIC, 12));
-        header.add(subtitle, BorderLayout.SOUTH);
-        return header;
+        JPanel mark = new JPanel();
+        mark.setBackground(UiTheme.ACCENT);
+        mark.setPreferredSize(new Dimension(38, 38));
+        JLabel initials = new JLabel("MG", javax.swing.SwingConstants.CENTER);
+        initials.setFont(UiTheme.font(14, Font.BOLD));
+        initials.setForeground(Color.WHITE);
+        mark.add(initials);
+
+        JPanel titles = new JPanel();
+        titles.setLayout(new BoxLayout(titles, BoxLayout.Y_AXIS));
+        titles.setBackground(UiTheme.SURFACE);
+        JLabel title = UiTheme.heading("Mamat Gunshop");
+        JLabel subtitle = UiTheme.muted("Katalog & kasir senjata api — data demo lokal");
+        titles.add(title);
+        titles.add(Box.createVerticalStrut(2));
+        titles.add(subtitle);
+
+        brand.add(mark, BorderLayout.WEST);
+        brand.add(titles, BorderLayout.CENTER);
+        bar.add(brand, BorderLayout.WEST);
+        bar.add(UiTheme.muted("v1.0"), BorderLayout.EAST);
+        return bar;
     }
 
     private JSplitPane buildContent() {
-        JScrollPane filterScroll = new JScrollPane(filterPanel);
+        JScrollPane filterScroll = UiTheme.scroll(filterPanel);
         filterScroll.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
-        JScrollPane tableScroll = new JScrollPane(table);
-        tableScroll.setBorder(BorderFactory.createTitledBorder("Katalog Produk"));
+        JPanel main = new JPanel(new BorderLayout(0, 0));
+        main.setBackground(UiTheme.CANVAS);
+        main.add(buildToolbar(), BorderLayout.NORTH);
+        main.add(UiTheme.scroll(table), BorderLayout.CENTER);
+        main.add(buildDetail(), BorderLayout.SOUTH);
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, filterScroll, tableScroll);
-        split.setDividerLocation(285);
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, filterScroll, main);
+        split.setDividerLocation(292);
         split.setResizeWeight(0.0);
+        split.setBorder(null);
         return split;
     }
 
-    private JPanel buildBottom() {
-        JPanel root = new JPanel(new BorderLayout(8, 6));
-        root.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+    private JPanel buildToolbar() {
+        JPanel toolbar = new JPanel(new BorderLayout(12, 0));
+        toolbar.setBackground(UiTheme.CANVAS);
+        toolbar.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
-        actions.add(cartButton);
+        JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        right.setBackground(UiTheme.CANVAS);
+        right.add(resultLabel);
+        right.add(UiTheme.muted("Urutkan"));
+        right.add(sortCombo);
 
-        JButton historyButton = UiUtils.primary("Riwayat Order");
+        toolbar.add(UiTheme.label("Cari"), BorderLayout.WEST);
+        toolbar.add(searchField, BorderLayout.CENTER);
+        toolbar.add(right, BorderLayout.EAST);
+        return toolbar;
+    }
+
+    private JPanel buildDetail() {
+        JPanel card = UiTheme.card();
+        card.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.LINE),
+                UiTheme.cardBorder()));
+
+        JPanel header = new JPanel(new BorderLayout(2, 2));
+        header.setBackground(UiTheme.SURFACE);
+        header.add(detailName, BorderLayout.NORTH);
+        header.add(detailMeta, BorderLayout.SOUTH);
+
+        JPanel body = new JPanel(new BorderLayout(16, 0));
+        body.setBackground(UiTheme.SURFACE);
+        body.add(UiTheme.scroll(detailDescription), BorderLayout.CENTER);
+
+        JPanel side = new JPanel();
+        side.setLayout(new BoxLayout(side, BoxLayout.Y_AXIS));
+        side.setBackground(UiTheme.SURFACE);
+        detailPrice.setAlignmentX(JLabel.RIGHT_ALIGNMENT);
+        detailStock.setAlignmentX(JLabel.RIGHT_ALIGNMENT);
+        addButton.setAlignmentX(JLabel.RIGHT_ALIGNMENT);
+
+        JPanel qty = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+        qty.setBackground(UiTheme.SURFACE);
+        qty.add(UiTheme.muted("Jumlah"));
+        qty.add(qtySpinner);
+
+        side.add(detailPrice);
+        side.add(Box.createVerticalStrut(4));
+        side.add(detailStock);
+        side.add(Box.createVerticalStrut(10));
+        side.add(qty);
+        side.add(Box.createVerticalStrut(8));
+        side.add(addButton);
+
+        body.add(side, BorderLayout.EAST);
+        card.add(header, BorderLayout.NORTH);
+        card.add(body, BorderLayout.CENTER);
+        return card;
+    }
+
+    private JPanel buildActionBar() {
+        JPanel bar = new JPanel(new BorderLayout(12, 0));
+        bar.setBackground(UiTheme.SURFACE);
+        bar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(10, 16, 10, 16)));
+
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        buttons.setBackground(UiTheme.SURFACE);
+        buttons.add(cartButton);
+
+        JButton historyButton = UiTheme.secondary("Riwayat order");
         historyButton.addActionListener(e -> openHistory());
-
-        JButton adminButton = UiUtils.primary("Admin");
+        JButton adminButton = UiTheme.secondary("Admin");
         adminButton.addActionListener(e -> openAdmin());
-
-        JButton exportButton = UiUtils.primary("Export CSV");
+        JButton exportButton = UiTheme.ghost("Export CSV");
         exportButton.addActionListener(e -> exportCsv());
+        buttons.add(historyButton);
+        buttons.add(adminButton);
+        buttons.add(exportButton);
 
-        actions.add(historyButton);
-        actions.add(adminButton);
-        actions.add(exportButton);
-        actions.add(statusLabel);
-        root.add(actions, BorderLayout.NORTH);
-
-        JPanel detail = new JPanel(new BorderLayout(4, 4));
-        detail.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Detail Produk"),
-                BorderFactory.createEmptyBorder(4, 4, 4, 4)));
-        detailArea.setEditable(false);
-        detailArea.setLineWrap(true);
-        detailArea.setWrapStyleWord(true);
-        JScrollPane detailScroll = new JScrollPane(detailArea);
-        detailScroll.setPreferredSize(new Dimension(620, 110));
-        detail.add(detailScroll, BorderLayout.CENTER);
-        root.add(detail, BorderLayout.CENTER);
-
-        JPanel addPanel = new JPanel();
-        addPanel.setLayout(new BoxLayout(addPanel, BoxLayout.Y_AXIS));
-        addPanel.add(new JLabel("Jumlah:"));
-        addPanel.add(qtySpinner);
-        addPanel.add(javax.swing.Box.createVerticalStrut(6));
-        addPanel.add(addButton);
-        root.add(addPanel, BorderLayout.EAST);
-        return root;
+        bar.add(buttons, BorderLayout.WEST);
+        bar.add(statusLabel, BorderLayout.CENTER);
+        return bar;
     }
 
     private void refreshOptions() {
@@ -176,52 +282,84 @@ public class MainFrame extends JFrame {
     }
 
     private void refreshCatalog() {
-        List<Product> products = context.catalog().search(filterPanel.getCriteria());
+        FilterCriteria criteria = filterPanel.getCriteria();
+        criteria.setKeyword(searchField.getText());
+        criteria.setSort((SortOption) sortCombo.getSelectedItem());
+
+        List<Product> products = context.catalog().search(criteria);
         tableModel.setProducts(products);
-        statusLabel.setText("Menampilkan " + products.size()
-                + " produk • klik kaliber di sebelah kiri untuk memfilter");
+        resultLabel.setText(products.size() + " dari " + context.inventory().findAll().size() + " produk");
+
         if (table.getRowCount() > 0) {
             table.setRowSelectionInterval(0, 0);
         } else {
-            detailArea.setText("Tidak ada produk yang cocok dengan kriteria ini.");
-            addButton.setEnabled(false);
+            selectedProduct = null;
+            clearDetail("Tidak ada produk yang cocok dengan kriteria ini.");
         }
         updateDetail();
     }
 
+    private void clearDetail(String message) {
+        detailName.setText("Pilih produk");
+        detailMeta.setText(message);
+        detailPrice.setText("Rp 0");
+        detailStock.setText("");
+        detailDescription.setText("");
+        addButton.setEnabled(false);
+        qtySpinner.setEnabled(false);
+    }
+
     private void updateDetail() {
-        Product product = tableModel.productAt(table.getSelectedRow());
-        if (product == null) {
-            addButton.setEnabled(false);
+        selectedProduct = tableModel.productAt(table.getSelectedRow());
+        if (selectedProduct == null) {
             return;
         }
-        detailArea.setText(
-                "Nama       : " + product.getName() + "\n"
-                        + "Merek      : " + product.getBrand() + "\n"
-                        + "Tipe       : " + (product.getType() == null ? "-" : product.getType().getLabel()) + "\n"
-                        + "Kaliber    : " + product.getCaliber() + "\n"
-                        + "Kapasitas  : " + product.getCapacity() + " peluru\n"
-                        + "Harga      : " + Money.format(product.getPrice()) + "\n"
-                        + "Stok       : " + product.getStock() + "\n\n"
-                        + "Deskripsi  : " + (product.getDescription() == null ? "-" : product.getDescription()));
-        detailArea.setCaretPosition(0);
-        addButton.setEnabled(product.isInStock());
+        qtySpinner.setEnabled(true);
+        SpinnerNumberModel model = (SpinnerNumberModel) qtySpinner.getModel();
+        model.setMaximum(Math.max(1, selectedProduct.getStock()));
+        if ((Integer) qtySpinner.getValue() > Math.max(1, selectedProduct.getStock())) {
+            qtySpinner.setValue(Math.max(1, selectedProduct.getStock()));
+        }
+
+        detailName.setText(selectedProduct.getName());
+        detailMeta.setText(selectedProduct.getBrand() + "  •  "
+                + (selectedProduct.getType() == null ? "-" : selectedProduct.getType().getLabel())
+                + "  •  " + selectedProduct.getCaliber()
+                + "  •  kapasitas " + selectedProduct.getCapacity() + " peluru");
+        detailPrice.setText(Money.format(selectedProduct.getPrice()));
+        detailStock.setText(selectedProduct.isInStock()
+                ? "Stok tersedia: " + selectedProduct.getStock()
+                : "Stok habis");
+        detailStock.setForeground(selectedProduct.isInStock() ? UiTheme.SUCCESS : UiTheme.DANGER);
+        detailDescription.setText(selectedProduct.getDescription() == null
+                ? "" : selectedProduct.getDescription());
+        detailDescription.setCaretPosition(0);
+        addButton.setEnabled(selectedProduct.isInStock());
     }
 
     private void addToCart() {
-        Product product = tableModel.productAt(table.getSelectedRow());
-        if (product == null) {
-            UiUtils.showError(this, "Pilih produk terlebih dahulu.");
+        if (selectedProduct == null) {
+            setStatus("Pilih produk terlebih dahulu.", UiTheme.DANGER);
             return;
         }
         int quantity = (Integer) qtySpinner.getValue();
         try {
-            context.cart().add(product.getId(), quantity);
+            context.cart().add(selectedProduct.getId(), quantity);
             updateCartButton();
-            UiUtils.showInfo(this, quantity + " × " + product.getName() + " ditambahkan ke keranjang.");
+            setStatus(quantity + " × " + selectedProduct.getName() + " ditambahkan ke keranjang.",
+                    UiTheme.SUCCESS);
         } catch (IllegalArgumentException ex) {
-            UiUtils.showError(this, ex.getMessage());
+            setStatus(ex.getMessage(), UiTheme.DANGER);
         }
+    }
+
+    private void setStatus(String message, Color color) {
+        statusLabel.setText(message);
+        statusLabel.setForeground(color == null ? UiTheme.MUTED : color);
+    }
+
+    private void setStatus(String message) {
+        setStatus(message, UiTheme.MUTED);
     }
 
     private void updateCartButton() {
@@ -270,7 +408,7 @@ public class MainFrame extends JFrame {
         }
         try {
             Files.writeString(target, csv.toString(), StandardCharsets.UTF_8);
-            UiUtils.showInfo(this, "Berhasil mengekspor " + products.size() + " produk ke:\n" + target);
+            setStatus("Diekspor " + products.size() + " produk ke " + target.getFileName(), UiTheme.SUCCESS);
         } catch (Exception ex) {
             UiUtils.showError(this, "Gagal menulis CSV: " + ex.getMessage());
         }

@@ -7,11 +7,10 @@ import com.mamatgunshop.util.Money;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -21,13 +20,15 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Dialog;
 import java.awt.Window;
-import java.awt.GridLayout;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,21 +43,31 @@ public class AdminDialog extends JDialog {
     private final DefaultTableModel tableModel = new DefaultTableModel(
             new Object[]{"ID", "Nama", "Merek", "Tipe", "Kaliber", "Harga", "Stok"}, 0) {
         @Override
+        public Class<?> getColumnClass(int column) {
+            return switch (column) {
+                case 5 -> BigDecimal.class;
+                case 6 -> Integer.class;
+                default -> String.class;
+            };
+        }
+
+        @Override
         public boolean isCellEditable(int row, int column) {
             return false;
         }
     };
     private final JTable table = new JTable(tableModel);
 
-    private final JTextField idField = new JTextField();
-    private final JTextField nameField = new JTextField();
-    private final JTextField brandField = new JTextField();
+    private final JTextField idField = UiTheme.field();
+    private final JTextField nameField = UiTheme.field();
+    private final JTextField brandField = UiTheme.field();
     private final JComboBox<GunType> typeCombo = new JComboBox<>(GunType.values());
-    private final JTextField caliberField = new JTextField();
+    private final JTextField caliberField = UiTheme.field();
     private final JSpinner capacitySpinner = new JSpinner(new SpinnerNumberModel(0, 0, 999, 1));
-    private final JTextField priceField = new JTextField();
+    private final JTextField priceField = UiTheme.field();
     private final JSpinner stockSpinner = new JSpinner(new SpinnerNumberModel(0, 0, 99999, 1));
-    private final JTextArea descriptionArea = new JTextArea(3, 20);
+    private final JTextArea descriptionArea = UiTheme.area(3, 20);
+    private final JLabel statusLabel = UiTheme.muted("Pilih produk untuk mengubah, atau klik Produk baru.");
 
     private String selectedId;
 
@@ -64,33 +75,56 @@ public class AdminDialog extends JDialog {
         super(owner, "Admin — Kelola Produk", Dialog.ModalityType.APPLICATION_MODAL);
         this.context = context;
         this.onProductsChanged = onProductsChanged;
-        setSize(1020, 620);
-        setLocationRelativeTo(owner);
-        setLayout(new BorderLayout(8, 8));
 
-        table.setRowHeight(26);
+        setSize(1080, 660);
+        setMinimumSize(new Dimension(900, 560));
+        setLocationRelativeTo(owner);
+        getContentPane().setBackground(UiTheme.CANVAS);
+        setLayout(new BorderLayout(0, 0));
+
+        JPanel header = new JPanel(new BorderLayout(2, 2));
+        header.setBackground(UiTheme.SURFACE);
+        header.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(14, 18, 12, 18)));
+        header.add(UiTheme.heading("Kelola produk"), BorderLayout.NORTH);
+        header.add(UiTheme.muted("Perubahan tersimpan otomatis ke products.json."),
+                BorderLayout.SOUTH);
+        add(header, BorderLayout.NORTH);
+
+        UiTheme.styleTable(table);
+        UiTheme.styleComboBox(typeCombo);
+        UiTheme.styleSpinner(capacitySpinner);
+        UiTheme.styleSpinner(stockSpinner);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 fillFormFromSelection();
             }
         });
-        JScrollPane tableScroll = new JScrollPane(table);
-        tableScroll.setBorder(BorderFactory.createTitledBorder("Daftar Produk"));
 
-        JPanel form = buildForm();
-        JScrollPane formScroll = new JScrollPane(form);
-        formScroll.setBorder(BorderFactory.createTitledBorder("Form Produk"));
+        JScrollPane tableScroll = UiTheme.scroll(table);
+        tableScroll.setBorder(UiTheme.sectionBorder("Daftar produk"));
+
+        JScrollPane formScroll = UiTheme.scroll(buildForm());
+        formScroll.setBorder(UiTheme.sectionBorder("Form produk"));
 
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, tableScroll, formScroll);
-        split.setDividerLocation(560);
+        split.setDividerLocation(600);
+        split.setResizeWeight(0.55);
+        split.setBorder(null);
         add(split, BorderLayout.CENTER);
 
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 6));
-        JButton newButton = UiUtils.primary("Produk Baru");
-        JButton saveButton = UiUtils.primary("Simpan");
-        JButton deleteButton = UiUtils.primary("Hapus");
-        JButton closeButton = UiUtils.primary("Tutup");
-        newButton.addActionListener(e -> clearForm());
+        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        buttons.setBackground(UiTheme.SURFACE);
+        JButton newButton = UiTheme.secondary("Produk baru");
+        JButton saveButton = UiTheme.primary("Simpan");
+        JButton deleteButton = UiTheme.danger("Hapus");
+        JButton closeButton = UiTheme.ghost("Tutup");
+        newButton.addActionListener(e -> {
+            clearForm();
+            setStatus("Form siap untuk produk baru.");
+        });
         saveButton.addActionListener(e -> save());
         deleteButton.addActionListener(e -> delete());
         closeButton.addActionListener(e -> dispose());
@@ -98,35 +132,55 @@ public class AdminDialog extends JDialog {
         buttons.add(saveButton);
         buttons.add(deleteButton);
         buttons.add(closeButton);
-        add(buttons, BorderLayout.SOUTH);
+
+        JPanel footer = new JPanel(new BorderLayout(12, 0));
+        footer.setBackground(UiTheme.SURFACE);
+        footer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(12, 18, 12, 18)));
+        footer.add(buttons, BorderLayout.WEST);
+        footer.add(statusLabel, BorderLayout.CENTER);
+        add(footer, BorderLayout.SOUTH);
 
         idField.setEditable(false);
+        idField.setForeground(UiTheme.MUTED);
         refresh();
     }
 
     private JPanel buildForm() {
         JPanel form = new JPanel();
         form.setLayout(new BoxLayout(form, BoxLayout.Y_AXIS));
-        form.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        form.setBackground(UiTheme.SURFACE);
+        form.setBorder(javax.swing.BorderFactory.createEmptyBorder(12, 12, 12, 12));
 
-        form.add(labeled("ID:", idField));
-        form.add(labeled("Nama:", nameField));
-        form.add(labeled("Merek:", brandField));
-        form.add(labeled("Tipe:", typeCombo));
-        form.add(labeled("Kaliber:", caliberField));
-        form.add(labeled("Kapasitas (peluru):", capacitySpinner));
-        form.add(labeled("Harga (Rp):", priceField));
-        form.add(labeled("Stok:", stockSpinner));
-        form.add(labeled("Deskripsi:", new JScrollPane(descriptionArea)));
+        form.add(labeled("ID", idField));
+        form.add(labeled("Nama", nameField));
+        form.add(labeled("Merek", brandField));
+        form.add(labeled("Tipe", typeCombo));
+        form.add(labeled("Kaliber", caliberField));
+        form.add(labeled("Kapasitas (peluru)", capacitySpinner));
+        form.add(labeled("Harga (Rp)", priceField));
+        form.add(labeled("Stok", stockSpinner));
+        form.add(labeled("Deskripsi", new JScrollPane(descriptionArea)));
         return form;
     }
 
-    private JPanel labeled(String label, java.awt.Component field) {
-        JPanel panel = new JPanel(new BorderLayout(4, 2));
-        panel.setMaximumSize(new Dimension(400, 60));
-        panel.add(new JLabel(label), BorderLayout.NORTH);
+    private JPanel labeled(String label, JComponent field) {
+        JPanel panel = new JPanel(new BorderLayout(4, 3));
+        panel.setBackground(UiTheme.SURFACE);
+        panel.setMaximumSize(new Dimension(420, field instanceof JScrollPane ? 88 : 58));
+        panel.add(UiTheme.label(label), BorderLayout.NORTH);
         panel.add(field, BorderLayout.CENTER);
         return panel;
+    }
+
+    private void setStatus(String message) {
+        setStatus(message, UiTheme.MUTED);
+    }
+
+    private void setStatus(String message, Color color) {
+        statusLabel.setText(message);
+        statusLabel.setForeground(color);
     }
 
     private void refresh() {
@@ -137,7 +191,7 @@ public class AdminDialog extends JDialog {
             tableModel.addRow(new Object[]{
                     p.getId(), p.getName(), p.getBrand(),
                     p.getType() == null ? "-" : p.getType().getLabel(),
-                    p.getCaliber(), Money.format(p.getPrice()), p.getStock()
+                    p.getCaliber(), p.getPrice(), p.getStock()
             });
         }
         if (table.getRowCount() > 0) {
@@ -202,8 +256,9 @@ public class AdminDialog extends JDialog {
             if (onProductsChanged != null) {
                 onProductsChanged.run();
             }
-            UiUtils.showInfo(this, "Produk berhasil disimpan.");
+            setStatus("Produk \"" + product.getName() + "\" berhasil disimpan.", UiTheme.SUCCESS);
         } catch (IllegalArgumentException ex) {
+            setStatus(ex.getMessage(), UiTheme.DANGER);
             UiUtils.showError(this, ex.getMessage());
         }
     }
@@ -211,12 +266,12 @@ public class AdminDialog extends JDialog {
     private void delete() {
         Product product = selectedProduct();
         if (product == null) {
-            UiUtils.showError(this, "Pilih produk yang akan dihapus.");
+            setStatus("Pilih produk yang akan dihapus.", UiTheme.DANGER);
             return;
         }
         int confirm = JOptionPane.showConfirmDialog(this,
-                "Hapus produk \"" + product.getName() + "\"?", "Konfirmasi Hapus",
-                JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+                "Hapus produk \"" + product.getName() + "\"?\nTindakan ini tidak dapat dibatalkan.",
+                "Konfirmasi hapus", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
         if (confirm != JOptionPane.YES_OPTION) {
             return;
         }
@@ -226,5 +281,6 @@ public class AdminDialog extends JDialog {
         if (onProductsChanged != null) {
             onProductsChanged.run();
         }
+        setStatus("Produk \"" + product.getName() + "\" dihapus.", UiTheme.DANGER);
     }
 }

@@ -2,204 +2,279 @@ package com.mamatgunshop.ui;
 
 import com.mamatgunshop.model.FilterCriteria;
 import com.mamatgunshop.model.GunType;
-import com.mamatgunshop.model.SortOption;
 import com.mamatgunshop.util.Money;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
-import javax.swing.DefaultListModel;
-import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTextField;
-import javax.swing.event.DocumentEvent;
-import javax.swing.event.DocumentListener;
-import java.awt.Dimension;
-import java.awt.event.ActionListener;
-import java.util.HashSet;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
-/** Panel filter kiri: pencarian + kriteria + sortir. */
+/** Panel filter dengan checkbox eksplisit dan ringkasan filter aktif (chip). */
 public class FilterPanel extends JPanel {
 
     private final Runnable onChange;
-    private final JTextField searchField = new JTextField();
-    private final JTextField minPriceField = new JTextField();
-    private final JTextField maxPriceField = new JTextField();
-    private final JCheckBox stockOnlyBox = new JCheckBox("Stok tersedia saja");
-    private final JComboBox<SortOption> sortCombo = new JComboBox<>(SortOption.values());
+    private final Map<String, JCheckBox> caliberChecks = new LinkedHashMap<>();
+    private final Map<GunType, JCheckBox> typeChecks = new LinkedHashMap<>();
+    private final Map<String, JCheckBox> brandChecks = new LinkedHashMap<>();
 
-    private final DefaultListModel<String> caliberModel = new DefaultListModel<>();
-    private final DefaultListModel<GunType> typeModel = new DefaultListModel<>();
-    private final DefaultListModel<String> brandModel = new DefaultListModel<>();
-    private final JList<String> caliberList = new JList<>(caliberModel);
-    private final JList<GunType> typeList = new JList<>(typeModel);
-    private final JList<String> brandList = new JList<>(brandModel);
+    private final JPanel caliberPanel = new JPanel(new GridLayout(0, 1, 2, 4));
+    private final JPanel typePanel = new JPanel(new GridLayout(0, 1, 2, 4));
+    private final JPanel brandPanel = new JPanel(new GridLayout(0, 1, 2, 4));
+    private final JPanel chipsPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+
+    private final JTextField minPriceField = UiTheme.field();
+    private final JTextField maxPriceField = UiTheme.field();
+    private final JCheckBox stockOnlyBox = checkBox("Stok tersedia saja");
+    private final JLabel validationLabel = UiTheme.muted("");
 
     private boolean updating = false;
 
     public FilterPanel(Runnable onChange) {
         this.onChange = onChange;
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+        setBackground(UiTheme.CANVAS);
+        setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
 
-        add(searchBlock());
-        add(UiUtils.titled("Kaliber", listScroll(caliberList, 5)));
-        add(UiUtils.titled("Tipe Senjata", listScroll(typeList, 4)));
-        add(UiUtils.titled("Merek", listScroll(brandList, 5)));
-        add(priceBlock());
-        add(stockOnlyBox);
-        add(sortBlock());
+        JLabel title = UiTheme.subheading("Filter katalog");
+        title.setAlignmentX(LEFT_ALIGNMENT);
+        add(title);
 
-        JButton resetButton = UiUtils.primary("Reset Filter");
-        resetButton.addActionListener(e -> reset());
-        add(resetButton);
+        JPanel caliberSection = section("Kaliber", caliberPanel);
+        JPanel typeSection = section("Tipe senjata", typePanel);
+        JPanel brandSection = section("Merek", brandPanel);
+        caliberSection.setAlignmentX(LEFT_ALIGNMENT);
+        typeSection.setAlignmentX(LEFT_ALIGNMENT);
+        brandSection.setAlignmentX(LEFT_ALIGNMENT);
 
-        addLiveListener(searchField);
-        addLiveListener(minPriceField);
-        addLiveListener(maxPriceField);
-        installSelectionListener(caliberList);
-        installSelectionListener(typeList);
-        installSelectionListener(brandList);
-        stockOnlyBox.addActionListener(e -> fireChange());
-        sortCombo.addActionListener(e -> fireChange());
+        add(caliberSection);
+        add(javax.swing.Box.createVerticalStrut(UiTheme.GAP));
+        add(typeSection);
+        add(javax.swing.Box.createVerticalStrut(UiTheme.GAP));
+        add(brandSection);
+        add(javax.swing.Box.createVerticalStrut(UiTheme.GAP));
+        add(section("Rentang harga", pricePanel()));
+        add(javax.swing.Box.createVerticalStrut(UiTheme.GAP));
+
+        JPanel availability = new JPanel(new BorderLayout());
+        availability.setBackground(UiTheme.SURFACE);
+        availability.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(UiTheme.LINE),
+                BorderFactory.createEmptyBorder(10, 10, 10, 10)));
+        availability.add(stockOnlyBox, BorderLayout.WEST);
+        availability.setAlignmentX(LEFT_ALIGNMENT);
+        add(availability);
+        add(javax.swing.Box.createVerticalStrut(UiTheme.GAP));
+
+        JPanel active = section("Filter aktif", chipsPanel);
+        active.setAlignmentX(LEFT_ALIGNMENT);
+        add(active);
+
+        javax.swing.JButton reset = resetButton();
+        reset.setAlignmentX(LEFT_ALIGNMENT);
+        add(reset);
+
+        validationLabel.setAlignmentX(LEFT_ALIGNMENT);
+        add(javax.swing.Box.createVerticalStrut(4));
+        add(validationLabel);
+
+        installListeners();
     }
 
-    private JPanel searchBlock() {
-        JPanel panel = new JPanel(new java.awt.BorderLayout(0, 4));
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Cari produk"),
-                BorderFactory.createEmptyBorder(4, 4, 4, 4)));
-        panel.add(new JLabel("Nama / merek / kaliber:"), java.awt.BorderLayout.NORTH);
-        panel.add(searchField, java.awt.BorderLayout.CENTER);
-        return panel;
+    private JPanel section(String title, JPanel content) {
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setBackground(UiTheme.SURFACE);
+        wrapper.setBorder(UiTheme.sectionBorder(title));
+        content.setBackground(UiTheme.SURFACE);
+        wrapper.add(content, BorderLayout.CENTER);
+        return wrapper;
     }
 
-    private JScrollPane listScroll(JList<?> list, int rows) {
-        list.setVisibleRowCount(rows);
-        JScrollPane scroll = new JScrollPane(list);
-        scroll.setPreferredSize(new Dimension(220, rows * 24 + 8));
-        return scroll;
-    }
-
-    private JPanel priceBlock() {
-        JPanel panel = new JPanel(new java.awt.GridLayout(2, 2, 4, 4));
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Rentang harga (Rp)"),
-                BorderFactory.createEmptyBorder(4, 4, 4, 4)));
-        panel.add(new JLabel("Minimum"));
-        panel.add(new JLabel("Maksimum"));
+    private JPanel pricePanel() {
+        JPanel panel = new JPanel(new java.awt.GridLayout(2, 2, 8, 8));
+        panel.setBackground(UiTheme.SURFACE);
+        panel.add(UiTheme.muted("Minimum"));
+        panel.add(UiTheme.muted("Maksimum"));
         panel.add(minPriceField);
         panel.add(maxPriceField);
         return panel;
     }
 
-    private JPanel sortBlock() {
-        JPanel panel = new JPanel(new java.awt.BorderLayout(0, 2));
-        panel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createTitledBorder("Urutkan"),
-                BorderFactory.createEmptyBorder(4, 4, 4, 4)));
-        panel.add(sortCombo, java.awt.BorderLayout.CENTER);
-        return panel;
+    private static JCheckBox checkBox(String text) {
+        JCheckBox box = new JCheckBox(text);
+        box.setFont(UiTheme.font(13));
+        box.setForeground(UiTheme.INK);
+        box.setBackground(UiTheme.SURFACE);
+        box.setFocusPainted(false);
+        return box;
     }
 
     public void setOptions(List<String> calibers, List<GunType> types, List<String> brands) {
         updating = true;
-        List<String> oldCalibers = caliberList.getSelectedValuesList();
-        List<GunType> oldTypes = typeList.getSelectedValuesList();
-        List<String> oldBrands = brandList.getSelectedValuesList();
+        Set<String> oldCalibers = selected(caliberChecks);
+        Set<GunType> oldTypes = selected(typeChecks);
+        Set<String> oldBrands = selected(brandChecks);
 
-        caliberModel.clear();
-        calibers.forEach(caliberModel::addElement);
-        typeModel.clear();
-        types.forEach(typeModel::addElement);
-        brandModel.clear();
-        brands.forEach(brandModel::addElement);
+        rebuildChecks(caliberPanel, caliberChecks, calibers, oldCalibers);
+        rebuildChecks(typePanel, typeChecks, types, oldTypes);
+        rebuildChecks(brandPanel, brandChecks, brands, oldBrands);
 
-        for (String value : oldCalibers) {
-            if (calibers.contains(value)) {
-                caliberList.setSelectedValue(value, false);
-            }
-        }
-        for (GunType value : oldTypes) {
-            if (types.contains(value)) {
-                typeList.setSelectedValue(value, false);
-            }
-        }
-        for (String value : oldBrands) {
-            if (brands.contains(value)) {
-                brandList.setSelectedValue(value, false);
-            }
-        }
         updating = false;
         fireChange();
+    }
+
+    private <T> void rebuildChecks(JPanel panel, Map<T, JCheckBox> map,
+                                   List<T> options, Set<T> keepSelected) {
+        map.clear();
+        panel.removeAll();
+        for (T option : options) {
+            JCheckBox box = checkBox(String.valueOf(option));
+            box.setSelected(keepSelected.contains(option));
+            box.addItemListener(e -> fireChange());
+            map.put(option, box);
+            panel.add(box);
+        }
+        panel.revalidate();
+        panel.repaint();
     }
 
     public FilterCriteria getCriteria() {
         FilterCriteria criteria = new FilterCriteria();
-        criteria.setKeyword(searchField.getText());
-        criteria.setCalibers(new HashSet<>(caliberList.getSelectedValuesList()));
-        criteria.setTypes(new HashSet<>(typeList.getSelectedValuesList()));
-        criteria.setBrands(new HashSet<>(brandList.getSelectedValuesList()));
+        criteria.setCalibers(selected(caliberChecks));
+        criteria.setTypes(selected(typeChecks));
+        criteria.setBrands(selected(brandChecks));
         try {
             criteria.setMinPrice(Money.parse(minPriceField.getText()));
             criteria.setMaxPrice(Money.parse(maxPriceField.getText()));
-        } catch (IllegalArgumentException ignored) {
-            // input belum valid saat diketik — kriteria harga diabaikan sementara
+            validationLabel.setText("");
+            validationLabel.setForeground(UiTheme.MUTED);
+        } catch (IllegalArgumentException e) {
+            criteria.setMinPrice(null);
+            criteria.setMaxPrice(null);
+            validationLabel.setText("Format harga tidak valid — filter harga diabaikan.");
+            validationLabel.setForeground(UiTheme.DANGER);
         }
         criteria.setInStockOnly(stockOnlyBox.isSelected());
-        criteria.setSort((SortOption) sortCombo.getSelectedItem());
         return criteria;
     }
 
-    public void reset() {
-        updating = true;
-        searchField.setText("");
-        minPriceField.setText("");
-        maxPriceField.setText("");
-        caliberList.clearSelection();
-        typeList.clearSelection();
-        brandList.clearSelection();
-        stockOnlyBox.setSelected(false);
-        sortCombo.setSelectedItem(SortOption.NAME_ASC);
-        updating = false;
-        fireChange();
+    private <T> Set<T> selected(Map<T, JCheckBox> map) {
+        Set<T> result = new LinkedHashSet<>();
+        map.forEach((key, box) -> {
+            if (box.isSelected()) {
+                result.add(key);
+            }
+        });
+        return result;
+    }
+
+    private void installListeners() {
+        stockOnlyBox.addItemListener(e -> fireChange());
+        addLiveListener(minPriceField);
+        addLiveListener(maxPriceField);
+    }
+
+    private void addLiveListener(JTextField field) {
+        field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            @Override
+            public void insertUpdate(javax.swing.event.DocumentEvent e) {
+                fireChange();
+            }
+
+            @Override
+            public void removeUpdate(javax.swing.event.DocumentEvent e) {
+                fireChange();
+            }
+
+            @Override
+            public void changedUpdate(javax.swing.event.DocumentEvent e) {
+                fireChange();
+            }
+        });
     }
 
     private void fireChange() {
+        rebuildChips();
         if (!updating) {
             onChange.run();
         }
     }
 
-    private void installSelectionListener(JList<?> list) {
-        list.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                fireChange();
-            }
-        });
+    private void rebuildChips() {
+        chipsPanel.removeAll();
+        chipsPanel.setBackground(UiTheme.SURFACE);
+        boolean any = false;
+        any |= addChips(caliberChecks);
+        any |= addChips(typeChecks);
+        any |= addChips(brandChecks);
+        if (stockOnlyBox.isSelected()) {
+            chipsPanel.add(chip("Stok tersedia", () -> stockOnlyBox.setSelected(false)));
+            any = true;
+        }
+        if (!minPriceField.getText().isBlank() || !maxPriceField.getText().isBlank()) {
+            chipsPanel.add(chip("Harga", () -> {
+                minPriceField.setText("");
+                maxPriceField.setText("");
+            }));
+            any = true;
+        }
+        if (!any) {
+            JLabel empty = UiTheme.muted("Belum ada filter dipilih");
+            chipsPanel.add(empty);
+        }
+        chipsPanel.revalidate();
+        chipsPanel.repaint();
     }
 
-    private void addLiveListener(JTextField field) {
-        field.getDocument().addDocumentListener(new DocumentListener() {
-            @Override
-            public void insertUpdate(DocumentEvent e) {
-                fireChange();
+    private <T> boolean addChips(Map<T, JCheckBox> map) {
+        for (Map.Entry<T, JCheckBox> entry : map.entrySet()) {
+            if (entry.getValue().isSelected()) {
+                chipsPanel.add(chip(String.valueOf(entry.getKey()),
+                        () -> entry.getValue().setSelected(false)));
             }
+        }
+        return map.values().stream().anyMatch(JCheckBox::isSelected);
+    }
 
-            @Override
-            public void removeUpdate(DocumentEvent e) {
-                fireChange();
-            }
-
-            @Override
-            public void changedUpdate(DocumentEvent e) {
-                fireChange();
-            }
+    private javax.swing.JButton chip(String text, Runnable onRemove) {
+        javax.swing.JButton chip = UiTheme.ghost(text + "  ×");
+        chip.setToolTipText("Hapus filter " + text);
+        chip.addActionListener(e -> {
+            updating = true;
+            onRemove.run();
+            updating = false;
+            fireChange();
         });
+        return chip;
+    }
+
+    public void reset() {
+        updating = true;
+        caliberChecks.values().forEach(box -> box.setSelected(false));
+        typeChecks.values().forEach(box -> box.setSelected(false));
+        brandChecks.values().forEach(box -> box.setSelected(false));
+        minPriceField.setText("");
+        maxPriceField.setText("");
+        stockOnlyBox.setSelected(false);
+        validationLabel.setText("");
+        updating = false;
+        fireChange();
+    }
+
+    public javax.swing.JButton resetButton() {
+        javax.swing.JButton button = UiTheme.ghost("Reset semua filter");
+        button.addActionListener(e -> reset());
+        return button;
     }
 }

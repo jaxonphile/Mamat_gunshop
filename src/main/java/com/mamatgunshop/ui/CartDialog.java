@@ -5,40 +5,52 @@ import com.mamatgunshop.model.CartItem;
 import com.mamatgunshop.util.Money;
 
 import javax.swing.BorderFactory;
-import javax.swing.table.DefaultTableModel;
 import javax.swing.JButton;
 import javax.swing.JDialog;
-import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.ListSelectionModel;
+import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
-import java.awt.FlowLayout;
 import java.awt.Dialog;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.Window;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Dialog keranjang: ubah qty, hapus item, lanju ke checkout. */
+/** Dialog keranjang: ubah qty, hapus item, lanjut ke checkout. */
 public class CartDialog extends JDialog {
 
     private final AppContext context;
     private final Runnable onCartChanged;
     private final DefaultTableModel tableModel = new DefaultTableModel(
-            new Object[]{"Nama", "Kaliber", "Harga", "Qty", "Subtotal"}, 0) {
+            new Object[]{"Produk", "Kaliber", "Harga", "Qty", "Subtotal"}, 0) {
+        @Override
+        public Class<?> getColumnClass(int column) {
+            return switch (column) {
+                case 2, 4 -> java.math.BigDecimal.class;
+                case 3 -> Integer.class;
+                default -> String.class;
+            };
+        }
+
         @Override
         public boolean isCellEditable(int row, int column) {
             return false;
         }
     };
     private final JTable table = new JTable(tableModel);
-    private final JLabel totalLabel = new JLabel("Total: Rp 0");
+    private final JLabel totalLabel = UiTheme.subheading("Total: Rp 0");
 
-    private final JButton plusButton = UiUtils.primary("+ Tambah Qty");
-    private final JButton minusButton = UiUtils.primary("- Kurangi Qty");
-    private final JButton removeButton = UiUtils.primary("Hapus Item");
-    private final JButton checkoutButton = UiUtils.primary("Checkout");
+    private final JButton plusButton = UiTheme.secondary("+ Tambah");
+    private final JButton minusButton = UiTheme.secondary("− Kurangi");
+    private final JButton removeButton = UiTheme.danger("Hapus item");
+    private final JButton checkoutButton = UiTheme.primary("Lanjut checkout");
+    private final JButton closeButton = UiTheme.ghost("Tutup");
 
     private List<CartItem> currentItems = new ArrayList<>();
 
@@ -46,33 +58,56 @@ public class CartDialog extends JDialog {
         super(owner, "Keranjang Belanja", Dialog.ModalityType.APPLICATION_MODAL);
         this.context = context;
         this.onCartChanged = onCartChanged;
-        setSize(720, 460);
-        setLocationRelativeTo(owner);
-        setLayout(new BorderLayout(8, 8));
 
-        table.setRowHeight(26);
+        setSize(760, 480);
+        setMinimumSize(new Dimension(640, 400));
+        setLocationRelativeTo(owner);
+        getContentPane().setBackground(UiTheme.CANVAS);
+        setLayout(new BorderLayout(0, 0));
+
+        JPanel header = new JPanel(new BorderLayout(2, 2));
+        header.setBackground(UiTheme.SURFACE);
+        header.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(14, 18, 14, 18)));
+        header.add(UiTheme.heading("Keranjang belanja"), BorderLayout.NORTH);
+        header.add(UiTheme.muted("Periksa jumlah item sebelum melanjutkan ke checkout."),
+                BorderLayout.SOUTH);
+        add(header, BorderLayout.NORTH);
+
+        UiTheme.styleTable(table);
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 updateButtons();
             }
         });
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        add(UiTheme.scroll(table), BorderLayout.CENTER);
 
-        JPanel south = new JPanel(new BorderLayout(4, 4));
-        south.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        buttons.add(plusButton);
-        buttons.add(minusButton);
-        buttons.add(removeButton);
-        south.add(buttons, BorderLayout.WEST);
-        south.add(totalLabel, BorderLayout.EAST);
+        JPanel summary = new JPanel(new BorderLayout(12, 0));
+        summary.setBackground(UiTheme.SURFACE);
+        JPanel editing = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        editing.setBackground(UiTheme.SURFACE);
+        editing.add(plusButton);
+        editing.add(minusButton);
+        editing.add(removeButton);
+        totalLabel.setFont(UiTheme.font(15, Font.BOLD));
+        summary.add(editing, BorderLayout.WEST);
+        summary.add(totalLabel, BorderLayout.EAST);
 
-        JPanel checkoutRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 4));
-        JButton closeButton = UiUtils.primary("Tutup");
-        checkoutRow.add(closeButton);
-        checkoutRow.add(checkoutButton);
-        south.add(checkoutRow, BorderLayout.SOUTH);
-        add(south, BorderLayout.SOUTH);
+        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        actions.setBackground(UiTheme.SURFACE);
+        actions.add(closeButton);
+        actions.add(checkoutButton);
+
+        JPanel footer = new JPanel(new BorderLayout(0, 10));
+        footer.setBackground(UiTheme.SURFACE);
+        footer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, UiTheme.LINE),
+                BorderFactory.createEmptyBorder(12, 18, 14, 18)));
+        footer.add(summary, BorderLayout.NORTH);
+        footer.add(actions, BorderLayout.SOUTH);
+        add(footer, BorderLayout.SOUTH);
 
         plusButton.addActionListener(e -> changeQuantity(1));
         minusButton.addActionListener(e -> changeQuantity(-1));
@@ -90,9 +125,9 @@ public class CartDialog extends JDialog {
             tableModel.addRow(new Object[]{
                     item.getProduct().getName(),
                     item.getProduct().getCaliber(),
-                    Money.format(item.getProduct().getPrice()),
+                    item.getProduct().getPrice(),
                     item.getQuantity(),
-                    Money.format(item.getSubtotal())
+                    item.getSubtotal()
             });
         }
         totalLabel.setText("Total: " + Money.format(context.cart().getCart().getTotal()));

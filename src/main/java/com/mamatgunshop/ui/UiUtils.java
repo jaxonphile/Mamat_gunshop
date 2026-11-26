@@ -1,38 +1,23 @@
 package com.mamatgunshop.ui;
 
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
-import javax.swing.UIManager;
-import javax.swing.border.TitledBorder;
 import java.awt.Component;
 
-/** Helper kecil untuk konsistensi tampilan Swing. */
+/** Kompatibilitas helper lama; sebagian besar UI memakai UiTheme langsung. */
 public final class UiUtils {
 
     public static void configureLookAndFeel() {
-        try {
-            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-        } catch (Exception ignored) {
-            try {
-                UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
-            } catch (Exception alsoIgnored) {
-                // bawaan Swing tetap usable
-            }
-        }
+        UiTheme.install();
     }
 
     public static JButton primary(String text) {
-        JButton button = new JButton(text);
-        button.setFocusPainted(false);
-        return button;
+        return UiTheme.primary(text);
     }
 
     public static JComponent titled(String title, JComponent content) {
-        TitledBorder border = BorderFactory.createTitledBorder(title);
-        content.setBorder(BorderFactory.createCompoundBorder(border,
-                BorderFactory.createEmptyBorder(4, 4, 4, 4)));
+        content.setBorder(UiTheme.sectionBorder(title));
         return content;
     }
 
