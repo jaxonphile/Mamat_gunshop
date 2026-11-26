@@ -30,8 +30,14 @@ Mamat_gunshop/
 │   ├── PRD.md                 # Product Requirement Document
 │   └── SRS.md                 # Software Requirement Specification
 ├── README.md
+├── run.sh                     # launcher Linux/macOS (auto-install)
+├── run.bat                    # launcher Windows (auto-install)
 ├── build.gradle
 ├── settings.gradle
+├── scripts/
+│   ├── bootstrap.sh
+│   └── bootstrap.ps1
+├── gradle/wrapper/            # Gradle Wrapper (unduh Gradle otomatis)
 └── src/
     ├── main/
     │   ├── java/com/mamatgunshop/
@@ -57,6 +63,30 @@ Mamat_gunshop/
 ---
 
 ## ▶️ Build & jalankan
+
+### 🚀 Cara paling gampang (auto-install)
+
+Tidak perlu install Java atau Gradle manual.
+
+**Windows:** klik dua kali `run.bat`  
+**Linux / macOS:**
+
+```bash
+cd /home/jax/jax/Mamat_gunshop
+./run.sh
+```
+
+Saat pertama kali dijalankan, launcher akan:
+
+1. Memakai JDK 25 yang sudah ada — kalau belum ada, unduh **Temurin 25** ke `~/.mamatgunshop/runtime` (Windows: `%USERPROFILE%\.mamatgunshop\runtime`)
+2. Memverifikasi checksum SHA-256 JDK sebelum dipakai
+3. Mengunduh Gradle 9.9 lewat **Gradle Wrapper** dan dependency (Jackson, JUnit)
+4. Membangun `mamat-gunshop-1.0.0-all.jar`
+5. Menjalankan aplikasi
+
+Butuh koneksi internet hanya pada run pertama (atau saat source berubah). Run berikutnya langsung jalan.
+
+### 🔧 Cara manual (opsional)
 
 ```bash
 cd /home/jax/jax/Mamat_gunshop
