@@ -1,5 +1,7 @@
 # Mamat Gunshop 🛒🔫
 
+[![CI](https://github.com/jaxonphile/Mamat_gunshop/actions/workflows/ci.yml/badge.svg)](https://github.com/jaxonphile/Mamat_gunshop/actions/workflows/ci.yml)
+
 Aplikasi desktop **e-commerce senjata api (demo lokal)** berbasis **Java 25 + Swing + Gradle**.
 Fokus utama: memfilter produk berdasarkan **kaliber**, tipe, merek, dan harga — lengkap dengan keranjang, checkout, struk, riwayat order, dan panel admin.
 
